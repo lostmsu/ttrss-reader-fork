@@ -17,6 +17,11 @@
 <resources>
 
     <string-array name="updates">
+		<item>Version 1.97.0
+			  * increased limit of stored articles to 50000
+			  * swipe to mark article as read
+		      * read articles are now more transparent
+		      * an option to show Mark Read/Unread in place of Publish in article view</item>
 	    <item>Version 1.96.1
 	         * Use OkHttp Library to reduce issues with SSL, optimize re-use of existing connection
 	         * Attempt fix of issue #425: Crash upon backing out to top of folder structure</item>
