@@ -17,6 +17,9 @@
 <resources>
 
     <string-array name="updates">
+		<item>Version 1.97.0
+			  * increased limit of stored articles to 50000
+			  * swipe to mark article as read</item>
 	    <item>Version 1.96.6
 	         * Fix #452: Added column \"score\" to DB initialization</item>
         <item>Version 1.96.5
