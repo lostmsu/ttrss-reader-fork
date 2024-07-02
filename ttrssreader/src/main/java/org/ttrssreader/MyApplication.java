@@ -17,9 +17,7 @@
 
 package org.ttrssreader;
 
-import android.app.Application;
 import android.content.Context;
-import android.os.Build;
 
 import org.ttrssreader.controllers.Controller;
 import org.ttrssreader.controllers.DBHelper;
@@ -27,28 +25,23 @@ import org.ttrssreader.controllers.Data;
 import org.ttrssreader.controllers.ProgressBarManager;
 import org.ttrssreader.utils.PRNGFixes;
 
-public class MyApplication extends Application {
+import androidx.multidex.MultiDexApplication;
+import androidx.work.Configuration;
+import androidx.work.WorkManager;
+
+public class MyApplication extends MultiDexApplication {
 
 	private static MyApplication instance;
 
 	//	private static final String TAG = MyApplication.class.getSimpleName();
 
 	public void onCreate() {
-
-		// workaround for https://code.google.com/p/android/issues/detail?id=20915
-		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.JELLY_BEAN) {
-			try {
-				Class.forName("android.os.AsyncTask");
-			} catch (ClassNotFoundException ignored) {
-				// Empty
-			}
-		}
-
 		super.onCreate();
 		instance = this;
 		PRNGFixes.apply();
 		initSingletons();
 		Data.getInstance().notifyListeners(); // Notify once to make sure the handler is initialized
+		WorkManager.initialize(this, new Configuration.Builder().build());
 
 		//AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
 	}

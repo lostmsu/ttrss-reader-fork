@@ -301,8 +301,7 @@ public class FeedHeadlineListFragment extends MainListFragment implements TextIn
 		}
 
 		@Override
-		public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-
+		public boolean onFling(@NonNull MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
 			try {
 				if (Math.abs(e1.getY() - e2.getY()) > Controller.relSwipeMaxOffPath)
 					return false;

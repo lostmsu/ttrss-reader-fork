@@ -1,22 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest package="org.ttrssreader"
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="internalOnly"
-    android:versionCode="1971"
-    android:versionName="1.97.1">
+    android:versionCode="1974"
+    android:versionName="1.97.4">
 
     <!-- Check connectivity -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Define special preferences for a Wifi-Network -->
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-
     <!-- Download -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Save articles to SDCard -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <!-- Vibrate on last article/feed -->
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -25,7 +18,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Only used to acquire WIFI SSID (which also can be used to get location information) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!-- Necessary to be able to call the background update from Tasker/Locale plugin -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -59,8 +54,8 @@
 
         <activity
             android:name=".gui.CategoryActivity"
-            android:label="@string/ApplicationName"
-            android:theme="@style/AppTheme.BrandedLaunch">
+            android:theme="@style/AppTheme.BrandedLaunch"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -74,7 +69,8 @@
         <activity android:name=".gui.ErrorActivity" />
         <activity
             android:name=".gui.AboutActivity"
-            android:label="@string/AboutActivity_Title">
+            android:label="@string/AboutActivity_Title"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
             </intent-filter>
@@ -83,7 +79,8 @@
             android:name=".gui.ShareActivity"
             android:excludeFromRecents="true"
             android:label="@string/IntentPublish"
-            android:theme="@style/AppTheme.BrandedLaunch">
+            android:theme="@style/AppTheme.BrandedLaunch"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -93,9 +90,8 @@
         <activity
             android:name=".gui.SubscribeActivity"
             android:label="@string/IntentSubscribe"
-            android:theme="@style/AppTheme.BrandedLaunch">
-
-            <!-- android:excludeFromRecents="true" -->
+            android:theme="@style/AppTheme.BrandedLaunch"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -106,11 +102,8 @@
             android:name=".gui.EditPluginActivity"
             android:exported="true"
             android:icon="@drawable/icon"
-            android:label="@string/ApplicationName"
-            android:uiOptions="splitActionBarWhenNarrow"
-            android:windowSoftInputMode="adjustResize"
-            tools:ignore="ExportedActivity"
-            android:theme="@style/AppTheme.BrandedLaunch">
+            android:label="@string/EditPluginActivity_Label"
+            tools:ignore="ExportedActivity">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
             </intent-filter>
@@ -134,6 +127,19 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Otherwise, remove only the WorkManagerInitializer node.-->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <!-- If you are using androidx.startup to initialize other components -->
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <!--
              Note that Locale will reject plug-in BroadcastReceivers for the following reasons:
                 - The BroadcastReceiver isn't exported (e.g. android:exported="false")
@@ -144,6 +150,7 @@
         <receiver
             android:name=".imageCache.PluginReceiver"
             android:exported="true"
+            android:process=":background"
             tools:ignore="ExportedReceiver">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />

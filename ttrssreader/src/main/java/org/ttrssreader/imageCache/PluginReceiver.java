@@ -17,15 +17,18 @@ package org.ttrssreader.imageCache;
 
 import android.content.Context;
 import android.content.Intent;
-import android.os.Bundle;
+import android.os.Build;
 import android.util.Log;
 
 import com.twofortyfouram.locale.sdk.client.receiver.AbstractPluginSettingReceiver;
 
+import org.json.JSONObject;
 import org.ttrssreader.controllers.Controller;
-import org.ttrssreader.imageCache.bundle.PluginBundleManager;
 
 import androidx.annotation.NonNull;
+import androidx.work.Data;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
 
 /**
  * This is the "fire" BroadcastReceiver for a Locale Plug-in setting.
@@ -35,33 +38,40 @@ public final class PluginReceiver extends AbstractPluginSettingReceiver {
 	private static final String TAG = PluginReceiver.class.getSimpleName();
 
 	@Override
-	protected void firePluginSetting(@NonNull Context context, @NonNull Bundle bundle) {
-		Log.d(TAG, "firePluginSetting() called, received Bundle for action...");
-
-		Controller.getInstance().setHeadless(true);
-
-		final boolean images = bundle.getBoolean(PluginBundleManager.BUNDLE_EXTRA_IMAGES);
-		final boolean notification = bundle.getBoolean(PluginBundleManager.BUNDLE_EXTRA_NOTIFICATION);
-
-		Intent serviceIntent;
-		if (images) {
-			serviceIntent = new Intent(ForegroundService.ACTION_LOAD_IMAGES);
-		} else {
-			serviceIntent = new Intent(ForegroundService.ACTION_LOAD_ARTICLES);
-		}
-		serviceIntent.setClass(context, ForegroundService.class);
-		serviceIntent.putExtra(ForegroundService.PARAM_SHOW_NOTIFICATION, notification);
-		context.startService(serviceIntent);
-	}
-
-	@Override
-	protected boolean isBundleValid(@NonNull final Bundle bundle) {
-		return PluginBundleManager.isBundleValid(bundle);
+	protected boolean isJsonValid(@NonNull final JSONObject json) {
+		return PluginJsonValues.isJsonValid(json);
 	}
 
 	@Override
 	protected boolean isAsync() {
 		return false;
+	}
+
+	@Override
+	protected void firePluginSetting(@NonNull final Context context, @NonNull final JSONObject json) {
+		Log.d(TAG, "firePluginSetting() called, received JSON for action...");
+
+		Controller.getInstance().setHeadless(true);
+
+		final boolean images = PluginJsonValues.getExtraImages(json);
+		final boolean notification = PluginJsonValues.getExtraNotification(json);
+
+		Intent intent = new Intent(images ? ForegroundService.ACTION_LOAD_IMAGES : ForegroundService.ACTION_LOAD_ARTICLES);
+		intent.setClass(context, ForegroundService.class);
+		intent.putExtra(ForegroundService.PARAM_SHOW_NOTIFICATION, notification);
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			Data data = new Data.Builder()
+					.putString(ForegroundService.PARAM_ACTION, images ? ForegroundService.ACTION_LOAD_IMAGES : ForegroundService.ACTION_LOAD_ARTICLES)
+					.putBoolean(ForegroundService.PARAM_SHOW_NOTIFICATION, notification)
+					.build();
+			OneTimeWorkRequest request = new OneTimeWorkRequest.Builder ( ForegroundWorker.class ).setInputData(data).addTag ( ForegroundWorker.TAG ).build ();
+			WorkManager.getInstance ( context ).enqueue ( request );
+		} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			context.startForegroundService ( intent );
+		} else {
+			context.startService ( intent );
+		}
 	}
 
 }
