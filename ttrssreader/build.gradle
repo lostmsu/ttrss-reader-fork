@@ -27,7 +27,7 @@ android {
     defaultConfig {
         applicationId 'org.ttrssreader'
         minSdkVersion 21
-        targetSdkVersion 35
+        targetSdkVersion 34
         multiDexEnabled true
     }
 
