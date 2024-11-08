@@ -63,7 +63,7 @@ public abstract class MainListFragment extends ListFragment implements LoaderMan
 
 	protected MainAdapter adapter = null;
 	protected GestureDetector gestureDetector;
-	protected View.OnTouchListener gestureListener;
+	protected View.OnTouchListener touchListener;
 
 	protected String title;
 	protected int unreadCount;
@@ -118,8 +118,8 @@ public abstract class MainListFragment extends ListFragment implements LoaderMan
 
 			MyGestureListener gestureListener = new MyGestureListener(actionBar, Controller.getInstance().hideActionbar(), getActivity());
 			gestureDetector = new GestureDetector(getActivity(), gestureListener, null);
-			this.gestureListener = (v, event) -> gestureDetector.onTouchEvent(event) || v.performClick();
-			getListView().setOnTouchListener(this.gestureListener);
+			touchListener = (v, event) -> gestureDetector.onTouchEvent(event) || v.performClick();
+			getListView().setOnTouchListener(touchListener);
 		}
 
 		// Read the selected list item after orientation changes and similar

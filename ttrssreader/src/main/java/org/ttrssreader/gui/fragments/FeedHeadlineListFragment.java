@@ -18,6 +18,7 @@
 package org.ttrssreader.gui.fragments;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -29,6 +30,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
@@ -132,12 +134,15 @@ public class FeedHeadlineListFragment extends MainListFragment implements TextIn
 		if (activity != null) {
 			ActionBar actionBar = activity.getSupportActionBar();
 
-			gestureDetector = new GestureDetector(getActivity(),
-					new HeadlineListGestureListener(actionBar, Controller.getInstance().hideActionbar(), getActivity()));
-			gestureListener = (v, event) -> gestureDetector.onTouchEvent(event) || v.performClick();
+			gestureDetector = new GestureDetector(getActivity(), new HeadlineListGestureListener(actionBar, Controller.getInstance().hideActionbar(), getActivity()));
+			touchListener = new View.OnTouchListener() {
+				public boolean onTouch(View v, MotionEvent event) {
+					return gestureDetector.onTouchEvent(event) || v.performClick();
+				}
+			};
 
 			if (getView() != null)
-				getView().setOnTouchListener(gestureListener);
+				getView().setOnTouchListener(touchListener);
 		}
 	}
 
@@ -301,11 +306,17 @@ public class FeedHeadlineListFragment extends MainListFragment implements TextIn
 		}
 
 		@Override
-		public boolean onFling(@NonNull MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
+		public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+			// Refresh metrics-data in Controller
+			FragmentActivity activity = getActivity();
+			if (activity != null) {
+				WindowManager wm = ((WindowManager) activity.getSystemService(Context.WINDOW_SERVICE));
+				if (wm != null)
+					Controller.refreshDisplayMetrics(wm.getDefaultDisplay());
+			}
 			try {
 				if (Math.abs(e1.getY() - e2.getY()) > Controller.relSwipeMaxOffPath)
 					return false;
-
 				return super.onFling(e1, e2, velocityX, velocityY);
 			} catch (Exception e) {
 				// Empty!
@@ -315,16 +326,19 @@ public class FeedHeadlineListFragment extends MainListFragment implements TextIn
 
 		@Override
 		public boolean onSwipe(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-			int pos1 = getListView().pointToPosition((int)e1.getX(), (int)e1.getY());
-			int pos2 = getListView().pointToPosition((int)e2.getX(), (int)e2.getY());
-			if (pos1 == pos2 && pos1 >= 0 && e2.getX() > e1.getX()){
-				Article article = (Article)adapter.getItem(pos1);
-				new Updater(getActivity(), new ArticleReadStateUpdater(article, article.isUnread ? 0 : 1)).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-				// https://stackoverflow.com/questions/4817770/android-listview-with-onitemclicklistener-and-gesturedetector
-				MotionEvent cancelEvent = MotionEvent.obtain(e2);
-				cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
-				getListView().onTouchEvent(cancelEvent);
-				return true;
+			// What do we do, swipe or mark read?
+			if (Controller.getInstance().swipeArticleMarkRead()) {
+				int pos1 = getListView().pointToPosition((int) e1.getX(), (int) e1.getY());
+				int pos2 = getListView().pointToPosition((int) e2.getX(), (int) e2.getY());
+				if (pos1 == pos2 && pos1 >= 0 && e2.getX() > e1.getX()) {
+					Article article = (Article) adapter.getItem(pos1);
+					new Updater(getActivity(), new ArticleReadStateUpdater(article, article.isUnread ? 0 : 1)).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+					// https://stackoverflow.com/questions/4817770/android-listview-with-onitemclicklistener-and-gesturedetector
+					MotionEvent cancelEvent = MotionEvent.obtain(e2);
+					cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
+					getListView().onTouchEvent(cancelEvent);
+					return true;
+				}
 			}
 
 			int direction = e1.getX() > e2.getX() ? 1 : -1;

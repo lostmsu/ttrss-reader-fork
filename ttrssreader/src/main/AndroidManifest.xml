@@ -2,8 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="internalOnly"
-    android:versionCode="1974"
-    android:versionName="1.97.4">
+    android:versionCode="1976"
+    android:versionName="1.97.6">
 
     <!-- Check connectivity -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -98,16 +98,6 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".gui.EditPluginActivity"
-            android:exported="true"
-            android:icon="@drawable/icon"
-            android:label="@string/EditPluginActivity_Label"
-            tools:ignore="ExportedActivity">
-            <intent-filter>
-                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
-            </intent-filter>
-        </activity>
 
         <meta-data
             android:name="com.google.android.backup.api_key"
@@ -147,16 +137,6 @@
                 - The BroadcastReceiver requires permissions not available to Locale
                 - There are multiple BroadcastReceivers for com.twofortyfouram.locale.intent.action.FIRE_SETTING
         -->
-        <receiver
-            android:name=".imageCache.PluginReceiver"
-            android:exported="true"
-            android:process=":background"
-            tools:ignore="ExportedReceiver">
-            <intent-filter>
-                <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
-            </intent-filter>
-        </receiver>
-
         <service
             android:name=".imageCache.ForegroundService"
             android:exported="false" />
