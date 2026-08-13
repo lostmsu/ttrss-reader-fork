@@ -67,8 +67,32 @@ public class JSONConnector {
 
 	private static final String TAG = JSONConnector.class.getSimpleName();
 
+	private static final int LAST_ERROR_DEFAULT = 0;
+	private static final int LAST_ERROR_REMOTE_UNAVAILABLE = 1;
+	private static final Object ERROR_LOCK = new Object();
+
 	private static String lastError = "";
 	private static boolean hasLastError = false;
+	private static int lastErrorType = LAST_ERROR_DEFAULT;
+	private static String serverIssue = "";
+
+	public static final class ConnectorError {
+		private final String message;
+		private final boolean remoteUnavailable;
+
+		private ConnectorError(String message, boolean remoteUnavailable) {
+			this.message = message;
+			this.remoteUnavailable = remoteUnavailable;
+		}
+
+		public String getMessage() {
+			return message;
+		}
+
+		public boolean isRemoteUnavailable() {
+			return remoteUnavailable;
+		}
+	}
 
 	private static final String PARAM_OP = "op";
 	private static final String PARAM_USER = "user";
@@ -220,27 +244,74 @@ public class JSONConnector {
 
 			// Check for HTTP Status codes:
 			int code = response.code();
-			if (!response.isSuccessful() || code >= 400 && code < 600) {
-				hasLastError = true;
-				lastError = "Server returned status: " + code + " (Message: " + response.message() + ")";
+			if (!response.isSuccessful()) {
+				setServerIssue("Server returned status: " + code + " (Message: " + response.message() + ")");
+				response.close();
 				return null;
 			}
 
 			// Read Response as stream:
 			ResponseBody body = response.body();
-			return body != null ? body.charStream() : null;
+			if (body == null) {
+				setServerIssue("Server returned an empty response.");
+				response.close();
+				return null;
+			}
+			clearServerIssue();
+			return body.charStream();
 
 		} catch (JsonSyntaxException e) {
-			hasLastError = true;
-			lastError = "JsonSyntaxException (Invalid JSON Data) in doRequest(): " + formatException(e);
+			setLastError("JsonSyntaxException (Invalid JSON Data) in doRequest(): " + formatException(e));
 		} catch (SSLPeerUnverifiedException e) {
-			hasLastError = true;
-			lastError = "SSLPeerUnverifiedException in doRequest(): " + formatException(e);
+			setLastError("SSLPeerUnverifiedException in doRequest(): " + formatException(e));
+		} catch (IOException e) {
+			setServerIssue("Exception in doRequest(): " + formatException(e));
 		} catch (Exception e) {
-			hasLastError = true;
-			lastError = "Exception in doRequest(): " + formatException(e);
+			setLastError("Exception in doRequest(): " + formatException(e));
 		}
 		return null;
+	}
+
+	private static void setLastError(String error) {
+		synchronized (ERROR_LOCK) {
+			hasLastError = true;
+			lastError = error;
+			lastErrorType = LAST_ERROR_DEFAULT;
+		}
+	}
+
+	private static void setServerIssue(String error) {
+		synchronized (ERROR_LOCK) {
+			hasLastError = true;
+			lastError = error;
+			lastErrorType = LAST_ERROR_REMOTE_UNAVAILABLE;
+			serverIssue = error;
+		}
+	}
+
+	private static void clearServerIssue() {
+		synchronized (ERROR_LOCK) {
+			serverIssue = "";
+		}
+	}
+
+	private static void resetLastErrorLocked() {
+		lastError = "";
+		hasLastError = false;
+		lastErrorType = LAST_ERROR_DEFAULT;
+	}
+
+	private static boolean isNotLoggedInError() {
+		synchronized (ERROR_LOCK) {
+			return NOT_LOGGED_IN.equals(lastError);
+		}
+	}
+
+	private static void markSessionExpired() {
+		synchronized (ERROR_LOCK) {
+			lastError = NOT_LOGGED_IN;
+			lastErrorType = LAST_ERROR_DEFAULT;
+		}
 	}
 
 	private Proxy getProxy() {
@@ -340,30 +411,31 @@ public class JSONConnector {
 				if (object.get(ERROR) != null) {
 					String message = object.get(ERROR).getAsString();
 					Context ctx = MyApplication.context();
+					String errorMessage;
 
 					switch (message) {
 						case API_DISABLED:
-							lastError = ctx.getString(R.string.Error_ApiDisabled, Controller.getInstance().username());
+							errorMessage = ctx.getString(R.string.Error_ApiDisabled, Controller.getInstance().username());
 							break;
 						case NOT_LOGGED_IN:
 						case LOGIN_ERROR:
 							if (!login && retry && internalLogin())
 								return readResult(params, false, false); // Just do the same request again
 							else
-								lastError = ctx.getString(R.string.Error_LoginFailed);
+								errorMessage = ctx.getString(R.string.Error_LoginFailed);
 							break;
 						case INCORRECT_USAGE:
-							lastError = ctx.getString(R.string.Error_ApiIncorrectUsage);
+							errorMessage = ctx.getString(R.string.Error_ApiIncorrectUsage);
 							break;
 						case UNKNOWN_METHOD:
-							lastError = ctx.getString(R.string.Error_ApiUnknownMethod);
+							errorMessage = ctx.getString(R.string.Error_ApiUnknownMethod);
 							break;
 						default:
-							lastError = ctx.getString(R.string.Error_ApiUnknownError);
+							errorMessage = ctx.getString(R.string.Error_ApiUnknownError);
 							break;
 					}
 
-					hasLastError = true;
+					setLastError(errorMessage);
 					Log.e(TAG, message);
 					return null;
 				}
@@ -458,22 +530,20 @@ public class JSONConnector {
 						String message = object.get(ERROR).toString();
 
 						if (message.contains(NOT_LOGGED_IN)) {
-							lastError = NOT_LOGGED_IN;
-							if (firstCall && internalLogin() && !hasLastError)
+							markSessionExpired();
+							if (firstCall && internalLogin() && !hasLastError())
 								return prepareReader(params, false); // Just do the same request again
 							else
 								return null;
 						}
 
 						if (message.contains(API_DISABLED)) {
-							hasLastError = true;
-							lastError = MyApplication.context().getString(R.string.Error_ApiDisabled, Controller.getInstance().username());
+							setLastError(MyApplication.context().getString(R.string.Error_ApiDisabled, Controller.getInstance().username()));
 							return null;
 						}
 
 						// Any other error
-						hasLastError = true;
-						lastError = message;
+						setLastError(message);
 					}
 				}
 
@@ -486,10 +556,10 @@ public class JSONConnector {
 
 	private boolean sessionNotAlive() {
 		// Make sure we are logged in
-		if (sessionId == null || lastError.equals(NOT_LOGGED_IN))
+		if (sessionId == null || isNotLoggedInError())
 			if (!internalLogin())
 				return true;
-		return hasLastError;
+		return hasLastError();
 	}
 
 	/**
@@ -514,9 +584,8 @@ public class JSONConnector {
 			pullLastError();
 		} catch (IOException e) {
 			e.printStackTrace();
-			if (!hasLastError) {
-				hasLastError = true;
-				lastError = formatException(e);
+			if (!hasLastError()) {
+				setLastError(formatException(e));
 			}
 		}
 
@@ -546,11 +615,11 @@ public class JSONConnector {
 		long time = System.currentTimeMillis();
 
 		// Just login once, check if already logged in after acquiring the lock on mSessionId
-		if (sessionId != null && !lastError.equals(NOT_LOGGED_IN))
+		if (sessionId != null && !isNotLoggedInError())
 			return true;
 
 		synchronized (loginLock) {
-			if (sessionId != null && !lastError.equals(NOT_LOGGED_IN))
+			if (sessionId != null && !isNotLoggedInError())
 				return true; // Login done while we were waiting for the lock
 
 			Map<String, String> params = new HashMap<>();
@@ -568,16 +637,14 @@ public class JSONConnector {
 					return true;
 				}
 			} catch (IOException e) {
-				if (!hasLastError) {
-					hasLastError = true;
-					lastError = formatException(e);
+				if (!hasLastError()) {
+					setLastError(formatException(e));
 				}
 			}
 
-			if (!hasLastError) {
+			if (!hasLastError()) {
 				// Login didnt succeed, write message
-				hasLastError = true;
-				lastError = MyApplication.context().getString(R.string.Error_NotLoggedIn);
+				setLastError(MyApplication.context().getString(R.string.Error_NotLoggedIn));
 			}
 			return false;
 		}
@@ -1034,7 +1101,7 @@ public class JSONConnector {
 
 			try (JsonReader reader = prepareReader(params)) {
 
-				if (hasLastError)
+				if (hasLastError())
 					return;
 				if (reader == null)
 					continue;
@@ -1274,7 +1341,26 @@ public class JSONConnector {
 	 * @return true if there was an error.
 	 */
 	public boolean hasLastError() {
-		return hasLastError;
+		synchronized (ERROR_LOCK) {
+			return hasLastError;
+		}
+	}
+
+	public String getServerIssue() {
+		synchronized (ERROR_LOCK) {
+			return serverIssue;
+		}
+	}
+
+	public ConnectorError pullConnectorError() {
+		synchronized (ERROR_LOCK) {
+			if (!hasLastError)
+				return null;
+
+			ConnectorError error = new ConnectorError(lastError, lastErrorType == LAST_ERROR_REMOTE_UNAVAILABLE);
+			resetLastErrorLocked();
+			return error;
+		}
 	}
 
 	/**
@@ -1283,10 +1369,8 @@ public class JSONConnector {
 	 * @return a string with the last error-message.
 	 */
 	public String pullLastError() {
-		String ret = lastError;
-		lastError = "";
-		hasLastError = false;
-		return ret;
+		ConnectorError error = pullConnectorError();
+		return error == null ? "" : error.getMessage();
 	}
 
 	/**

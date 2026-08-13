@@ -28,13 +28,13 @@
         android:id="@+id/frame_main"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/progressBarLayout" />
+        android:layout_below="@id/serverIssueBanner" />
 
     <FrameLayout
         android:id="@+id/list_divider"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
-        android:layout_below="@id/progressBarLayout"
+        android:layout_below="@id/serverIssueBanner"
         android:layout_toEndOf="@+id/frame_main"
         android:background="?colorBackground"
         tools:ignore="InconsistentLayout">
@@ -51,7 +51,7 @@
         android:id="@+id/frame_sub"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/progressBarLayout"
+        android:layout_below="@id/serverIssueBanner"
         android:layout_toEndOf="@+id/list_divider" />
 
     <FrameLayout

@@ -25,6 +25,7 @@ import android.graphics.Rect;
 import android.net.ConnectivityManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Menu;
@@ -55,6 +56,7 @@ import org.ttrssreader.imageCache.ForegroundWorker;
 import org.ttrssreader.model.updaters.IUpdatable;
 import org.ttrssreader.model.updaters.StateSynchronisationUpdater;
 import org.ttrssreader.model.updaters.Updater;
+import org.ttrssreader.net.JSONConnector;
 import org.ttrssreader.preferences.Constants;
 import org.ttrssreader.preferences.PreferencesActivity;
 import org.ttrssreader.utils.AsyncTask;
@@ -94,6 +96,7 @@ public abstract class MenuActivity extends MenuFlavorActivity implements IUpdate
 	private View frameSub = null;
 	//	private TextView header_title;
 	private TextView header_unread;
+	private TextView serverIssueBanner;
 	private Toolbar m_Toolbar;
 
 	private ProgressBar progressbar;
@@ -245,6 +248,7 @@ public abstract class MenuActivity extends MenuFlavorActivity implements IUpdate
 			header_unread = findViewById(R.id.head_unread);
 			progressbar = findViewById(R.id.progressbar);
 			progressspinner = findViewById(R.id.progressspinner);
+			serverIssueBanner = findViewById(R.id.serverIssueBanner);
 		}
 	}
 
@@ -561,7 +565,62 @@ public abstract class MenuActivity extends MenuFlavorActivity implements IUpdate
 		startActivityForResult(i, ErrorActivity.ACTIVITY_SHOW_ERROR);
 	}
 
+	protected void showServerIssue(String errorMessage) {
+		if (updater != null) {
+			updater.cancel(true);
+			updater = null;
+		}
+		ProgressBarManager.getInstance().resetProgress(this);
+		setServerIssueBanner(errorMessage);
+	}
+
+	private void setServerIssueBanner(String errorMessage) {
+		if (serverIssueBanner == null)
+			return;
+
+		if (errorMessage == null || errorMessage.length() == 0) {
+			serverIssueBanner.setText("");
+			serverIssueBanner.setVisibility(View.GONE);
+			return;
+		}
+
+		serverIssueBanner.setText(errorMessage);
+		serverIssueBanner.setVisibility(View.VISIBLE);
+	}
+
+	private void updateServerIssueBanner(JSONConnector connector) {
+		setServerIssueBanner(connector.getServerIssue());
+	}
+
+	public void showLastConnectorError() {
+		if (Looper.myLooper() != Looper.getMainLooper()) {
+			runOnUiThread(this::showLastConnectorError);
+			return;
+		}
+		if (isFinishing() || isDestroyed())
+			return;
+
+		JSONConnector connector = Controller.getInstance().getConnector();
+		JSONConnector.ConnectorError error = connector.pullConnectorError();
+		if (error == null)
+			return;
+
+		if (error.isRemoteUnavailable()) {
+			showServerIssue(error.getMessage());
+		} else {
+			updateServerIssueBanner(connector);
+			openConnectionErrorDialog(error.getMessage());
+		}
+	}
+
 	protected void showErrorDialog(String message) {
+		if (Looper.myLooper() != Looper.getMainLooper()) {
+			runOnUiThread(() -> showErrorDialog(message));
+			return;
+		}
+		if (isFinishing() || isDestroyed() || mOnSaveInstanceStateCalled)
+			return;
+
 		ErrorDialog.getInstance(message).show(getSupportFragmentManager(), "error");
 	}
 
@@ -587,8 +646,10 @@ public abstract class MenuActivity extends MenuFlavorActivity implements IUpdate
 	protected void doRefresh() {
 		invalidateOptionsMenu();
 		ProgressBarManager.getInstance().setIndeterminateVisibility(this);
-		if (Controller.getInstance().getConnector().hasLastError())
-			openConnectionErrorDialog(Controller.getInstance().getConnector().pullLastError());
+		JSONConnector connector = Controller.getInstance().getConnector();
+		updateServerIssueBanner(connector);
+		if (connector.hasLastError())
+			showLastConnectorError();
 	}
 
 	protected abstract void doUpdate(boolean forceUpdate);

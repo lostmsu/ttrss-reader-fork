@@ -64,7 +64,6 @@ import org.ttrssreader.R;
 import org.ttrssreader.controllers.Controller;
 import org.ttrssreader.controllers.DBHelper;
 import org.ttrssreader.controllers.ProgressBarManager;
-import org.ttrssreader.gui.ErrorActivity;
 import org.ttrssreader.gui.FeedHeadlineActivity;
 import org.ttrssreader.gui.MenuActivity;
 import org.ttrssreader.gui.TextInputAlert;
@@ -367,11 +366,13 @@ public class ArticleFragment extends Fragment implements TextInputAlertCallback 
 
 	@SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
 	private void doRefresh() {
-		if (webView == null)
+		Activity hostActivity = getActivity();
+		if (webView == null || !(hostActivity instanceof MenuActivity))
 			return;
+		MenuActivity menuActivity = (MenuActivity) hostActivity;
 
 		try {
-			ProgressBarManager.getInstance().addProgress((MenuActivity) getActivity());
+			ProgressBarManager.getInstance().addProgress(menuActivity);
 
 			if (Controller.getInstance().workOffline() || !Controller.getInstance().loadMedia()) {
 				webView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
@@ -387,9 +388,7 @@ public class ArticleFragment extends Fragment implements TextInputAlertCallback 
 
 			// Check for errors
 			if (Controller.getInstance().getConnector().hasLastError()) {
-				Intent i = new Intent(getActivity(), ErrorActivity.class);
-				i.putExtra(ErrorActivity.ERROR_MESSAGE, Controller.getInstance().getConnector().pullLastError());
-				startActivityForResult(i, ErrorActivity.ACTIVITY_SHOW_ERROR);
+				menuActivity.showLastConnectorError();
 				return;
 			}
 
@@ -491,7 +490,7 @@ public class ArticleFragment extends Fragment implements TextInputAlertCallback 
 		} catch (Exception e) {
 			Log.w(TAG, e.getClass().getSimpleName() + " in doRefresh(): " + e.getMessage() + " (" + e.getCause() + ")", e);
 		} finally {
-			ProgressBarManager.getInstance().removeProgress((MenuActivity) getActivity());
+			ProgressBarManager.getInstance().removeProgress(menuActivity);
 		}
 	}
 

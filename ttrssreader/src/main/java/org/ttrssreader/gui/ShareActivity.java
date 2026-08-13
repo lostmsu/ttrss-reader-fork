@@ -131,7 +131,7 @@ public class ShareActivity extends MenuActivity {
 				if (ret)
 					finishCompat();
 				else if (Controller.getInstance().getConnector().hasLastError())
-					showErrorDialog(Controller.getInstance().getConnector().pullLastError());
+					showLastConnectorError();
 				else if (Controller.getInstance().workOffline())
 					showErrorDialog("Working offline, synchronisation of published articles is not implemented yet.");
 				else

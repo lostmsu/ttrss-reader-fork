@@ -184,7 +184,7 @@ public class SubscribeActivity extends MenuActivity {
 				if (ret.code == 1)
 					finish();
 				else if (Controller.getInstance().getConnector().hasLastError())
-					showErrorDialog(Controller.getInstance().getConnector().pullLastError());
+					showLastConnectorError();
 				else if (ret.code == 2)
 					showErrorDialog(getResources().getString(R.string.SubscribeActivity_invalidUrl) + " " + message);
 				else if (ret.code == 3)

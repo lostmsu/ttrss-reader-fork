@@ -27,7 +27,7 @@
         android:id="@+id/subscribe_url"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/toolbar"
+        android:layout_below="@id/serverIssueBanner"
         android:hint="@string/Subscribe_url"
         android:inputType="textUri"
         android:singleLine="true">
